@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <EmbeddedResource Include="../Skapihub.Desktop/wwwroot/*" LogicalName="Skapihub.Ui.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../LICENSE" LogicalName="Skapihub.Legal.LICENSE" />
+    <EmbeddedResource Include="../../THIRD-PARTY-NOTICES.txt" LogicalName="Skapihub.Legal.NOTICES" />
+    <EmbeddedResource Include="../../licenses/*.txt" LogicalName="Skapihub.Legal.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

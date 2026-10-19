@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Skapihub.Core/Skapihub.Core.csproj" />
+    <Project Path="src/Skapihub.Desktop/Skapihub.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Skapihub.DesktopChecks/Skapihub.DesktopChecks.csproj" />
+    <Project Path="tests/Skapihub.IntegrationTests/Skapihub.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

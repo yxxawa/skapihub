@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>skapihub</AssemblyName>
+    <RootNamespace>Skapihub.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/skapihub.ico</ApplicationIcon>
+    <Version>1.0.0</Version>
+    <Product>skapihub</Product>
+    <Authors>yxxawa</Authors>
+    <Description>轻量 AI API 聚合中转</Description>
+    <RepositoryUrl>https://github.com/yxxawa/skapihub</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-x64'">x64</PlatformTarget>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-arm64'">arm64</PlatformTarget>
+    <PlatformTarget Condition="'$(RuntimeIdentifier)' == 'win-x86'">x86</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <WebView2LoaderPreference>Dynamic</WebView2LoaderPreference>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Skapihub.Core/Skapihub.Core.csproj" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3967.48" />
+  </ItemGroup>
+  <Target Name="ExcludeUnusedWpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" /></ItemGroup>
+  </Target>
+  <Target Name="ExcludeUnusedPublishFiles" AfterTargets="ComputeFilesToPublish" BeforeTargets="GenerateSingleFileBundle">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.xml' Or '%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+</Project>

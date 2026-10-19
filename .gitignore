@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+.vs/
+artifacts/
+output/
+.playwright-cli/
+*.user
+*.suo
+*.tmp
+*.log
+settings.dat
+usage.json
+webview/
+.env
+.env.*
