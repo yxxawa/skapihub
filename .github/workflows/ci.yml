@@ -33,5 +33,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: skapihub-${{ matrix.runtime }}
-          path: artifacts/release/v1.0.0/*.exe
+          path: artifacts/release/v1.1.0/*.exe
           if-no-files-found: error

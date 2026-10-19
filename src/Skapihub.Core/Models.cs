@@ -42,12 +42,12 @@ public sealed record SettingsInput(int Port, string ApiKey);
 public sealed record ToggleInput(bool Enabled);
 public sealed record ModelToggleInput(List<string> Models, bool Enabled);
 public sealed record ManualModelsInput(List<string> Models);
-public sealed record RouteCandidate(Relay Relay, KeyGroup Group);
 
 public sealed record RequestUsage
 {
     public DateTimeOffset At { get; init; } = DateTimeOffset.UtcNow;
     public string Model { get; init; } = "";
+    public string? RouteId { get; init; }
     public string RelayId { get; init; } = "";
     public string RelayName { get; init; } = "";
     public string GroupId { get; init; } = "";

@@ -56,6 +56,7 @@ public sealed class ConfigurationStore
         if (configuration.Port is < 1024 or > 65535) throw new ArgumentException("端口需为 1024–65535。 ");
         if (configuration.ApiKey is null) throw new ArgumentException("接入 Key 需为文本，可留空。 ");
         if (configuration.ApiKey.Contains('\r') || configuration.ApiKey.Contains('\n')) throw new ArgumentException("Key 不能包含换行。");
+        if (configuration.Relays.Select(relay => relay.Id).Distinct(StringComparer.Ordinal).Count() != configuration.Relays.Count) throw new ArgumentException("中转 ID 重复。");
         foreach (var relay in configuration.Relays)
         {
             NormalizeUrl(relay.Url);

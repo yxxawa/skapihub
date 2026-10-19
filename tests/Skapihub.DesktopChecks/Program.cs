@@ -100,7 +100,7 @@ internal static class Program
         });
         await Check("窗口隐藏后继续转发并记录用量", async () =>
         {
-            using var response = await api.PostAsJsonAsync("/v1/chat/completions", new { model = "gpt-test", messages = new[] { new { role = "user", content = "test" } } });
+            using var response = await api.PostAsJsonAsync("/v1/chat/completions", new { model = "桌面验证中转/默认/gpt-test", messages = new[] { new { role = "user", content = "test" } } });
             response.EnsureSuccessStatusCode(); var text = await response.Content.ReadAsStringAsync(); True(text.Contains("mock-completion", StringComparison.Ordinal), "后台代理未返回");
             var host = Field<GatewayHost>(window, "_host");
             await UntilAsync(() => host.Usage.Snapshot().Total.Requests == 1, "后台请求用量未记录");

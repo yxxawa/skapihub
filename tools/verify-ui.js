@@ -15,7 +15,7 @@ async (page) => {
   await page.getByRole('button', {name:'添加并获取模型',exact:true}).click();
   await page.getByRole('button', {name:'展开分组',exact:true}).waitFor();
   check(await page.locator('.group-row').count() === 0, '新增中转默认收起分组');
-  await page.waitForFunction(() => document.querySelector('.relay-row .row-model-count')?.textContent.includes('7'));
+  await page.waitForFunction(() => document.querySelector('.relay-row .row-model-count')?.textContent.includes('14'));
   check(await page.locator('.relay-table-head').innerText().then(text => !text.includes('余额')), '中转列表没有余额列');
   check(!await page.locator('#page-relays').innerText().then(text => text.includes('首字')), '中转页不显示首字延迟');
   await page.screenshot({path:'output/playwright/16-v04-collapsed.png'});
@@ -31,6 +31,12 @@ async (page) => {
   check(await page.locator('.spinner').count()===0, '同步完成后清理加载动画');
   await page.getByRole('button', {name:'管理 日常使用 的模型',exact:true}).click();
   await page.getByRole('switch', {name:'启用模型 gpt-test',exact:true}).waitFor();
+  check(await page.locator('[data-model="gpt-test"] .model-route').innerText() === 'Aurora API/日常使用/gpt-test', '模型面板显示当前分组的完整调用 ID');
+  check(await page.getByRole('button', {name:'复制调用 ID gpt-test',exact:true}).isVisible(), '模型旁提供完整 ID 复制按钮');
+  const published = await page.request.get(new URL('/v1/models', page.url()).href, {headers:{Authorization:'Bearer sk-local'}});
+  const catalog = (await published.json()).data;
+  check(catalog.filter(model=>model.upstream_model==='gpt-test').length === 2, '同名模型在 API 中按两个分组分别公开');
+  check(catalog.some(model=>model.id==='Aurora API/日常使用/gpt-test') && catalog.some(model=>model.id==='Aurora API/备用通道/gpt-test'), '完整调用 ID 包含中转和对应分组');
   await page.getByRole('switch', {name:'启用模型 gpt-test',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[aria-label="启用模型 gpt-test"]').getAttribute('aria-checked')==='false');
   checks.push('模型独立开关');
@@ -55,7 +61,7 @@ async (page) => {
   checks.push('自定义短 Key 保存');
   await page.getByRole('textbox', {name:'接入 Key',exact:true}).fill('sk-local');
   await page.getByRole('button', {name:'保存设置',exact:true}).click();
-  const response = await page.request.post(new URL('/v1/chat/completions',page.url()).href,{headers:{Authorization:'Bearer sk-local'},data:{model:'gpt-test',stream:true,messages:[{role:'user',content:'test'}]}});
+  const response = await page.request.post(new URL('/v1/chat/completions',page.url()).href,{headers:{Authorization:'Bearer sk-local'},data:{model:'Aurora API/日常使用/gpt-test',stream:true,messages:[{role:'user',content:'test'}]}});
   check(response.ok(),'流式请求成功');
   await page.reload();
   await page.getByRole('button',{name:'展开分组',exact:true}).waitFor();

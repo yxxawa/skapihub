@@ -205,7 +205,7 @@ public sealed class GatewayHost : IAsyncDisposable
         var config = Configuration.Current;
         return new
         {
-            name = "skapihub", version = "1.0.0", uiBuildId = Ui.BuildId, url = new Uri(Address, "/v1").ToString(), port = config.Port,
+            name = "skapihub", version = "1.1.0", uiBuildId = Ui.BuildId, url = new Uri(Address, "/v1").ToString(), port = config.Port,
             boundPort = Address.Port, apiKey = config.ApiKey, enabled = config.Enabled,
             restartRequired = config.Port != Address.Port, dataDirectory = Configuration.DirectoryPath,
             relays = config.Relays.Select(relay => new
@@ -213,7 +213,9 @@ public sealed class GatewayHost : IAsyncDisposable
                 relay.Id, relay.Name, relay.Url, relay.Enabled,
                 groups = relay.Groups.Select(group => new
                 {
-                    group.Id, group.Name, group.Enabled, group.Models, group.SyncedAt, group.SyncError,
+                    group.Id, group.Name, group.Enabled,
+                    models = group.Models.Select(model => new { model.Id, model.Enabled, routeId = ModelCatalog.RouteId(config, relay, group, model.Id) }),
+                    group.SyncedAt, group.SyncError,
                     keyPreview = group.Key.Length <= 8 ? new string('•', group.Key.Length) : group.Key[..4] + "••••" + group.Key[^4..]
                 })
             }),

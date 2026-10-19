@@ -19,6 +19,7 @@ internal sealed class MockUpstream : IAsyncDisposable
     public bool FailModels { get; set; }
     public int ModelDelayMs { get; set; }
     public bool RejectUsageOption { get; set; }
+    public ConcurrentDictionary<string, int> FailureStatuses { get; } = new();
     private MockUpstream(WebApplication app) => _app = app;
     public static async Task<MockUpstream> StartAsync()
     {
@@ -46,6 +47,7 @@ internal sealed class MockUpstream : IAsyncDisposable
         var endpoint = context.Request.Path.Value!;
         Calls.Enqueue((key, endpoint, model, context.Request.QueryString.Value ?? ""));
         if (RejectUsageOption && input.TryGetProperty("stream_options", out _)) { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = new { message = "Unsupported parameter: stream_options" } }); return; }
+        if (FailureStatuses.TryGetValue(key, out var failureStatus)) { context.Response.StatusCode = failureStatus; await context.Response.WriteAsJsonAsync(new { error = new { message = "group unavailable" } }); return; }
         if (key == "key-fail") { context.Response.StatusCode = 503; await context.Response.WriteAsJsonAsync(new { error = new { message = "unavailable" } }); return; }
         if (model == "invalid-request") { context.Response.StatusCode = 400; await context.Response.WriteAsJsonAsync(new { error = new { message = "invalid request" } }); return; }
         var stream = input.TryGetProperty("stream", out var streamElement) && streamElement.ValueKind == JsonValueKind.True;

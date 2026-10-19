@@ -13,7 +13,7 @@
 
 - 添加多个中转 URL，每个 Key 对应一个独立分组，支持批量填入。
 - 中转、分组、模型三级开关，默认收起分组。
-- 按 Key 获取模型，同名模型自动聚合、轮询分配，响应开始前自动故障切换。
+- 按 Key 获取模型，按中转站与分组分别发布，同名模型独立调用。
 - 统一的本地 Base URL 和自定义接入 Key。
 - 原协议 JSON / SSE 转发，支持 Chat、Responses、Claude Messages、Embeddings 等接口。
 - 最近请求显示真实首字延迟和上游报告的 Token 用量，不估算费用。
@@ -26,9 +26,9 @@
 
 | 文件 | 适用架构 |
 | --- | --- |
-| `skapihub-v1.0.0-windows-x64.exe` | Intel / AMD 64 位 Windows |
-| `skapihub-v1.0.0-windows-arm64.exe` | ARM64 Windows |
-| `skapihub-v1.0.0-windows-x86.exe` | x86 进程；也可在支持 x86 的 64 位 Windows 上运行 |
+| `skapihub-v1.1.0-windows-x64.exe` | Intel / AMD 64 位 Windows |
+| `skapihub-v1.1.0-windows-arm64.exe` | ARM64 Windows |
+| `skapihub-v1.1.0-windows-x86.exe` | x86 进程；也可在支持 x86 的 64 位 Windows 上运行 |
 
 运行环境：
 
@@ -56,6 +56,29 @@
 
 URL 可填写站点根地址、子路径，或以 `/v1` 等版本号结尾的地址。获取模型失败时保留已有模型及开关，也支持手动添加模型 ID。
 
+## 模型选择
+
+模型列表中的调用 ID 为 `中转名/分组名/模型名`，例如：
+
+```text
+站点A/默认/gpt-4.1
+站点A/备用/gpt-4.1
+站点B/默认/gpt-4.1
+```
+
+三个 ID 分别固定使用各自中转 URL 和分组 Key，不合并、不跨组轮询或故障切换。指定分组关闭、模型关闭或上游失败时，该 ID 会直接返回对应错误。
+
+客户端从 `/v1/models` 获取列表后直接选择完整 ID；也可以进入分组，在模型旁点击复制按钮。请求的 `model` 必须填写完整 ID，转发时程序会还原上游模型原名。
+
+同名站点或同站点下的同名分组会添加唯一标识后缀；名称中的 `/`、`%`、`@` 等保留符号会编码。请使用 API 返回或界面复制的 ID。修改站点、分组名称后，客户端需要重新获取模型列表。
+
+```json
+{
+  "model": "站点A/默认/gpt-4.1",
+  "messages": [{ "role": "user", "content": "你好" }]
+}
+```
+
 ## 托盘操作
 
 - 点击关闭按钮或按 `Alt+F4`：隐藏窗口，API 在后台继续运行。
@@ -78,7 +101,7 @@ URL 可填写站点根地址、子路径，或以 `/v1` 等版本号结尾的地
 
 ## 统计
 
-- **首字延迟**只显示在「用量 → 最近请求」：从请求进入到收到第一个有效文本、思考内容或工具调用增量，包含故障切换等待时间，跳过心跳与仅含角色的事件。
+- **首字延迟**只显示在「用量 → 最近请求」：从请求进入到收到第一个有效文本、思考内容或工具调用增量，跳过心跳与仅含角色的事件。
 - 非流式、没有有效内容或向量请求无法提供真实首字时间，显示「暂无」。
 - **Token**只读取上游实际 `usage`，兼容常见 Chat、Responses 和 Claude 格式；上游未报告时显示「未知」。
 - Chat 流默认请求 `include_usage`；上游明确拒绝时，用原请求回退。客户端显式关闭时保持原值。
@@ -120,7 +143,7 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -Runtime win-arm64
 ```
 
-结果位于 `artifacts/release/v1.0.0/`。发布使用 framework-dependent 单文件模式，显式设置 `SelfContained=false`，不携带 .NET Runtime。前端与许可证均从程序集内嵌资源读取。
+结果位于 `artifacts/release/v1.1.0/`。发布使用 framework-dependent 单文件模式，显式设置 `SelfContained=false`，不携带 .NET Runtime。前端与许可证均从程序集内嵌资源读取。
 
 ## 验证
 

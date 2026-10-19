@@ -73,25 +73,32 @@ internal static class Program
         var groupA = current.Groups[0].Id; var groupB = current.Groups[1].Id;
         var groupRouteA = "_app/relays/" + relayId + "/groups/" + groupA;
         var groupRouteB = "_app/relays/" + relayId + "/groups/" + groupB;
-        await Check("两个 Key 独立发现模型、同名模型只公开一次", async () =>
+        await Check("两个 Key 独立发现模型、同名模型按分组分别公开", async () =>
         {
             Equal(7, current.Groups[0].Models.Count); Equal(7, current.Groups[1].Models.Count);
-            var models = await client.GetFromJsonAsync<JsonObject>("v1/models"); Equal(7, models!["data"]!.AsArray().Count);
+            var models = await client.GetFromJsonAsync<JsonObject>("v1/models"); Equal(14, models!["data"]!.AsArray().Count);
         });
-        await Check("轮询分配至不同 Key", async () =>
+        await Check("分组调用 ID 固定选择各自 Key，不跨组轮询", async () =>
         {
-            var a = await Chat(client); var b = await Chat(client);
-            Equal("a", a!["served_by"]!.GetValue<string>()); Equal("b", b!["served_by"]!.GetValue<string>());
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                Equal("a", (await Chat(client))!["served_by"]!.GetValue<string>());
+                Equal("b", (await Chat(client, group: "备用"))!["served_by"]!.GetValue<string>());
+            }
+            True(upstream.Calls.All(call => call.Model == "gpt-test"), "上游收到带分组前缀的模型名");
         });
-        await Check("逐模型关闭后不再路由到对应分组", async () =>
+        await Check("逐模型关闭后对应 ID 不可调用，不切换至其他分组", async () =>
         {
             await Send(admin, groupRouteA + "/models/enabled", HttpMethod.Put, new { models = new[] { "gpt-test" }, enabled = false });
-            for (var i = 0; i < 2; i++) Equal("b", (await Chat(client))!["served_by"]!.GetValue<string>());
+            var before = upstream.Calls.Count;
+            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("gpt-test"), messages = Array.Empty<object>() });
+            Equal(HttpStatusCode.NotFound, response.StatusCode); Equal(before, upstream.Calls.Count);
+            Equal("b", (await Chat(client, group: "备用"))!["served_by"]!.GetValue<string>());
         });
         await Check("关闭分组后模型立即不可调用", async () =>
         {
             await Send(admin, groupRouteB + "/enabled", HttpMethod.Put, new { enabled = false });
-            var before = upstream.Calls.Count; using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = "gpt-test", messages = Array.Empty<object>() });
+            var before = upstream.Calls.Count; using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("gpt-test", "备用"), messages = Array.Empty<object>() });
             Equal(HttpStatusCode.NotFound, response.StatusCode); Equal(before, upstream.Calls.Count);
             await Send(admin, groupRouteB + "/enabled", HttpMethod.Put, new { enabled = true });
         });
@@ -107,18 +114,21 @@ internal static class Program
             True(!group.Models.Single(x => x.Id == "gpt-test").Enabled, "丢失开关");
         });
         await Send(admin, groupRouteA + "/models/enabled", HttpMethod.Put, new { models = new[] { "gpt-test" }, enabled = true });
-        await Check("503 在响应开始前切换至备用 Key", async () =>
+        await Check("指定分组返回 503 时不切换到其他 Key", async () =>
         {
             var snapshot = hub.Configuration.Current.Relays.Single();
             await hub.Configuration.UpdateAsync(cfg => cfg with { Relays = [snapshot with { Groups = [snapshot.Groups[0] with { Key = "key-fail" }, snapshot.Groups[1]] }] });
-            var response = await Chat(client); Equal("b", response!["served_by"]!.GetValue<string>());
+            var before = upstream.Calls.Count;
+            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("gpt-test"), messages = Array.Empty<object>() });
+            Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode); Equal(before + 1, upstream.Calls.Count);
+            Equal("key-fail", upstream.Calls.Last().Key);
             await hub.Configuration.UpdateAsync(cfg => cfg with { Relays = [snapshot] });
         });
         await Check("普通 400 不重试其他 Key", async () =>
         {
             await Send(admin, groupRouteA + "/models", HttpMethod.Post, new { models = new[] { "invalid-request" } });
             await Send(admin, groupRouteB + "/models", HttpMethod.Post, new { models = new[] { "invalid-request" } });
-            var before = upstream.Calls.Count; using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = "invalid-request", messages = Array.Empty<object>() });
+            var before = upstream.Calls.Count; using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("invalid-request"), messages = Array.Empty<object>() });
             Equal(HttpStatusCode.BadRequest, response.StatusCode); Equal(before + 1, upstream.Calls.Count);
         });
         await Check("Chat 流透传、自动请求用量、首字不计算心跳和角色", async () =>
@@ -142,7 +152,7 @@ internal static class Program
         });
         await Check("客户端显式关闭 include_usage 时保持原值", async () =>
         {
-            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = "gpt-test", stream = true, messages = Array.Empty<object>(), stream_options = new { include_usage = false } });
+            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("gpt-test"), stream = true, messages = Array.Empty<object>(), stream_options = new { include_usage = false } });
             response.EnsureSuccessStatusCode(); var text = await response.Content.ReadAsStringAsync(); True(!text.Contains("prompt_tokens", StringComparison.Ordinal), "覆盖了客户端用量设置");
         });
         await Check("Claude 流鉴权及起止事件用量合并", async () =>
@@ -157,7 +167,7 @@ internal static class Program
         });
         await Check("Embeddings 透传与输入 Token 统计", async () =>
         {
-            using var response = await client.PostAsJsonAsync("v1/embeddings", new { model = "embed-test", input = "hello" }); response.EnsureSuccessStatusCode();
+            using var response = await client.PostAsJsonAsync("v1/embeddings", new { model = Qualified("embed-test"), input = "hello" }); response.EnsureSuccessStatusCode();
             var row = await WaitUsage(hub, x => x.Model == "embed-test"); Equal(12L, row.InputTokens!.Value); True(row.FirstTokenMs is null, "向量请求不应伪造首字延迟");
         });
         await Check("未返回用量时保留未知，非流式不伪造首字", async () =>
@@ -172,7 +182,7 @@ internal static class Program
         });
         await Check("带斜线模型名和查询参数完整转发", async () =>
         {
-            using var response = await client.PostAsJsonAsync("v1/chat/completions?custom=one", new { model = "vendor/model-a", messages = Array.Empty<object>() }); response.EnsureSuccessStatusCode();
+            using var response = await client.PostAsJsonAsync("v1/chat/completions?custom=one", new { model = Qualified("vendor/model-a"), messages = Array.Empty<object>() }); response.EnsureSuccessStatusCode();
             var last = upstream.Calls.Last(); Equal("vendor/model-a", last.Model); Equal("?custom=one", last.Query); Equal("/api/v1/chat/completions", last.Endpoint);
         });
         await Check("全局暂停仅停止模型 API，管理仍可用", async () =>
@@ -191,7 +201,7 @@ internal static class Program
         await Check("手动添加和删除带斜线的模型", async () =>
         {
             await Send(admin, groupRouteA + "/models", HttpMethod.Post, new { models = new[] { "manual/vendor-model" } });
-            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = "manual/vendor-model", messages = Array.Empty<object>() }); response.EnsureSuccessStatusCode();
+            using var response = await client.PostAsJsonAsync("v1/chat/completions", new { model = Qualified("manual/vendor-model"), messages = Array.Empty<object>() }); response.EnsureSuccessStatusCode();
             await Send(admin, groupRouteA + "/models/remove", HttpMethod.Post, new { models = new[] { "manual/vendor-model" } });
             True(!hub.Configuration.Current.Relays.Single().Groups[0].Models.Any(x => x.Id == "manual/vendor-model"), "手动模型删除失败");
         });
@@ -241,21 +251,24 @@ internal static class Program
             await Send(admin, "_app/relays/" + relayId, HttpMethod.Put, new RelayInput(r.Name, r.Url, [new("默认", "new-key", groupA), new("备用", "key-b", groupB)]));
             Equal(0, hub.Configuration.Current.Relays.Single().Groups[0].Models.Count);
         });
-        await Check("多个不同 URL 的中转共同路由同名模型", async () =>
+        await Check("多个不同 URL 的同名模型分别固定到各自中转", async () =>
         {
             await using var second = await MockUpstream.StartAsync();
             var result = await Send(admin, "_app/relays", HttpMethod.Post, new RelayInput("第二个中转", second.Url, [new("独立分组", "key-c")]));
             var secondId = result!["id"]!.GetValue<string>();
             await Send(admin, "_app/relays/" + secondId + "/sync", HttpMethod.Post);
             var beforeFirst = upstream.Calls.Count;
-            for (var i = 0; i < 6; i++) await Chat(client, "embed-test");
-            True(upstream.Calls.Count > beforeFirst && second.Calls.Count > 0, "没有把两个上游汇合");
+            var beforeSecond = second.Calls.Count;
+            for (var i = 0; i < 3; i++) await Chat(client, "embed-test", "备用");
+            Equal(beforeFirst + 3, upstream.Calls.Count); Equal(beforeSecond, second.Calls.Count);
+            for (var i = 0; i < 3; i++) await Chat(client, "embed-test", "独立分组", "第二个中转");
+            Equal(beforeFirst + 3, upstream.Calls.Count); Equal(beforeSecond + 3, second.Calls.Count);
             await Send(admin, "_app/relays/" + secondId, HttpMethod.Delete);
         });
-        await Check("并发请求正确轮询、统计不丢失", async () =>
+        await Check("并发请求固定分组、统计不丢失", async () =>
         {
             var before = hub.Usage.Snapshot().Total.Requests;
-            await Task.WhenAll(Enumerable.Range(0, 24).Select(_ => Chat(client, "embed-test")));
+            await Task.WhenAll(Enumerable.Range(0, 24).Select(_ => Chat(client, "embed-test", "备用")));
             for (var i = 0; i < 40 && hub.Usage.Snapshot().Total.Requests < before + 24; i++) await Task.Delay(25);
             Equal(before + 24, hub.Usage.Snapshot().Total.Requests);
         });
@@ -304,6 +317,7 @@ internal static class Program
             True(!stored.Contains("balance", StringComparison.OrdinalIgnoreCase) && !stored.Contains("deprecated-secret", StringComparison.Ordinal), "旧字段仍被保存");
         });
         await UiAssetChecks.RunAsync(root, Check);
+        await GroupRoutingChecks.RunAsync(root, Check);
         Console.WriteLine($"RESULT {_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
     }
@@ -322,10 +336,11 @@ internal static class Program
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"HTTP {(int)response.StatusCode}: {text}");
         return string.IsNullOrEmpty(text) ? null : JsonNode.Parse(text) as JsonObject;
     }
-    private static Task<JsonObject?> Chat(HttpClient client, string model = "gpt-test") => Send(client, "v1/chat/completions", HttpMethod.Post, new { model, messages = new[] { new { role = "user", content = "hello" } } });
+    private static string Qualified(string model, string group = "默认", string relay = "测试中转") => relay + "/" + group + "/" + model;
+    private static Task<JsonObject?> Chat(HttpClient client, string model = "gpt-test", string group = "默认", string relay = "测试中转") => Send(client, "v1/chat/completions", HttpMethod.Post, new { model = Qualified(model, group, relay), messages = new[] { new { role = "user", content = "hello" } } });
     private static async Task<string> Stream(HttpClient client, string endpoint, string model)
     {
-        using var response = await client.PostAsJsonAsync("v1/" + endpoint, new { model, stream = true, messages = new[] { new { role = "user", content = "hello" } }, input = "hello", max_tokens = 20 });
+        using var response = await client.PostAsJsonAsync("v1/" + endpoint, new { model = Qualified(model), stream = true, messages = new[] { new { role = "user", content = "hello" } }, input = "hello", max_tokens = 20 });
         response.EnsureSuccessStatusCode(); return await response.Content.ReadAsStringAsync();
     }
     private static async Task<RequestUsage> WaitUsage(GatewayHost hub, Func<RequestUsage, bool> predicate)
