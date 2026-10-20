@@ -64,6 +64,24 @@ internal static class GroupRoutingChecks
             var row = models!["data"]!.AsArray().Single(item => item!["id"]!.GetValue<string>() == Id())!;
             Equal("gpt-test", row["upstream_model"]!.GetValue<string>()); Equal(target.Groups[0].Id, row["group_id"]!.GetValue<string>());
         });
+        await check("分组模型 · 显示原名，分组标题与唯一调用 ID 分别保留", async () =>
+        {
+            var response = await client.GetFromJsonAsync<JsonObject>("/v1/models");
+            var models = response!["data"]!.AsArray();
+            Equal(4, models.Count);
+            foreach (var entry in models)
+            {
+                var upstreamName = entry!["upstream_model"]!.GetValue<string>();
+                Equal(upstreamName, entry["name"]!.GetValue<string>());
+                Equal(upstreamName, entry["display_name"]!.GetValue<string>());
+                var group = target.Groups.Single(group => group.Id == entry["group_id"]!.GetValue<string>());
+                Equal(target.Name + "/" + group.Name, entry["owned_by"]!.GetValue<string>());
+                Equal(ModelCatalog.RouteId(hub.Configuration.Current, target, group, upstreamName), entry["id"]!.GetValue<string>());
+            }
+            Equal(2, models.Count(entry => entry!["name"]!.GetValue<string>() == "gpt-test"));
+            Equal(2, models.Count(entry => entry!["name"]!.GetValue<string>() == "vendor/model-a"));
+            Equal(4, models.Select(entry => entry!["id"]!.GetValue<string>()).Distinct(StringComparer.Ordinal).Count());
+        });
         await check("分组模型 · 不接受原始裸模型名或不完整前缀", async () =>
         {
             var before = upstream.Calls.Count;

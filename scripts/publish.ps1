@@ -1,7 +1,7 @@
 ﻿param(
     [ValidateSet('all', 'win-x64', 'win-arm64', 'win-x86')][string]$Runtime = 'all',
     [string]$OutputDirectory,
-    [string]$Version = '1.1.0'
+    [string]$Version = '1.1.1'
 )
 $ErrorActionPreference = 'Stop'
 $taskRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))

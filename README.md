@@ -26,9 +26,9 @@
 
 | 文件 | 适用架构 |
 | --- | --- |
-| `skapihub-v1.1.0-windows-x64.exe` | Intel / AMD 64 位 Windows |
-| `skapihub-v1.1.0-windows-arm64.exe` | ARM64 Windows |
-| `skapihub-v1.1.0-windows-x86.exe` | x86 进程；也可在支持 x86 的 64 位 Windows 上运行 |
+| `skapihub-v1.1.1-windows-x64.exe` | Intel / AMD 64 位 Windows |
+| `skapihub-v1.1.1-windows-arm64.exe` | ARM64 Windows |
+| `skapihub-v1.1.1-windows-x86.exe` | x86 进程；也可在支持 x86 的 64 位 Windows 上运行 |
 
 运行环境：
 
@@ -68,7 +68,11 @@ URL 可填写站点根地址、子路径，或以 `/v1` 等版本号结尾的地
 
 三个 ID 分别固定使用各自中转 URL 和分组 Key，不合并、不跨组轮询或故障切换。指定分组关闭、模型关闭或上游失败时，该 ID 会直接返回对应错误。
 
-客户端从 `/v1/models` 获取列表后直接选择完整 ID；也可以进入分组，在模型旁点击复制按钮。请求的 `model` 必须填写完整 ID，转发时程序会还原上游模型原名。
+`/v1/models` 中的 `name` 和 `display_name` 只包含模型原名，`owned_by` 提供「中转名/分组名」标题，`id` 保留完整调用 ID。支持显示名的客户端可在分组下只显示模型原名；始终显示 `id` 的客户端需要在客户端中调整显示方式。
+
+CC Switch 3.20.4 直接显示 `id`，可使用项目提供的[模型分组显示补丁](patches/cc-switch/README.md)，保留灰色分组标题并隐藏模型行中重复的前缀。
+
+客户端从 `/v1/models` 获取列表后选择模型；也可以进入分组，在模型旁点击复制按钮。请求的 `model` 必须填写完整 ID，转发时程序会还原上游模型原名。
 
 同名站点或同站点下的同名分组会添加唯一标识后缀；名称中的 `/`、`%`、`@` 等保留符号会编码。请使用 API 返回或界面复制的 ID。修改站点、分组名称后，客户端需要重新获取模型列表。
 
@@ -143,7 +147,7 @@ powershell -ExecutionPolicy Bypass -File scripts/publish.ps1
 powershell -ExecutionPolicy Bypass -File scripts/publish.ps1 -Runtime win-arm64
 ```
 
-结果位于 `artifacts/release/v1.1.0/`。发布使用 framework-dependent 单文件模式，显式设置 `SelfContained=false`，不携带 .NET Runtime。前端与许可证均从程序集内嵌资源读取。
+结果位于 `artifacts/release/v1.1.1/`。发布使用 framework-dependent 单文件模式，显式设置 `SelfContained=false`，不携带 .NET Runtime。前端与许可证均从程序集内嵌资源读取。
 
 ## 验证
 

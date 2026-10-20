@@ -205,7 +205,7 @@ public sealed class GatewayHost : IAsyncDisposable
         var config = Configuration.Current;
         return new
         {
-            name = "skapihub", version = "1.1.0", uiBuildId = Ui.BuildId, url = new Uri(Address, "/v1").ToString(), port = config.Port,
+            name = "skapihub", version = "1.1.1", uiBuildId = Ui.BuildId, url = new Uri(Address, "/v1").ToString(), port = config.Port,
             boundPort = Address.Port, apiKey = config.ApiKey, enabled = config.Enabled,
             restartRequired = config.Port != Address.Port, dataDirectory = Configuration.DirectoryPath,
             relays = config.Relays.Select(relay => new

@@ -32,7 +32,8 @@ public sealed class ProxyGateway(ConfigurationStore configuration, UsageStore us
         if (!config.Enabled) { await ErrorAsync(context, 503, "中转服务已暂停。", "gateway_paused"); return; }
         var models = ModelCatalog.Enabled(config).OrderBy(model => model.Id, StringComparer.Ordinal).Select(model => new
         {
-            id = model.Id, @object = "model", created = 0, owned_by = model.Relay.Name + "/" + model.Group.Name,
+            id = model.Id, name = model.UpstreamId, display_name = model.UpstreamId,
+            @object = "model", created = 0, owned_by = model.Relay.Name + "/" + model.Group.Name,
             upstream_model = model.UpstreamId, relay_id = model.Relay.Id, relay_name = model.Relay.Name,
             group_id = model.Group.Id, group_name = model.Group.Name
         });

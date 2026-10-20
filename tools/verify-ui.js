@@ -31,11 +31,15 @@ async (page) => {
   check(await page.locator('.spinner').count()===0, '同步完成后清理加载动画');
   await page.getByRole('button', {name:'管理 日常使用 的模型',exact:true}).click();
   await page.getByRole('switch', {name:'启用模型 gpt-test',exact:true}).waitFor();
-  check(await page.locator('[data-model="gpt-test"] .model-route').innerText() === 'Aurora API/日常使用/gpt-test', '模型面板显示当前分组的完整调用 ID');
+  check(await page.locator('[data-model="gpt-test"] .model-label').innerText() === 'gpt-test', '模型条目只显示模型原名');
+  check(await page.locator('[data-model="gpt-test"] .model-label').getAttribute('title') === 'Aurora API/日常使用/gpt-test', '完整调用 ID 保留在悬浮提示中');
+  check(await page.locator('.model-route').count() === 0, '模型条目不再重复显示分组前缀');
   check(await page.getByRole('button', {name:'复制调用 ID gpt-test',exact:true}).isVisible(), '模型旁提供完整 ID 复制按钮');
   const published = await page.request.get(new URL('/v1/models', page.url()).href, {headers:{Authorization:'Bearer sk-local'}});
   const catalog = (await published.json()).data;
   check(catalog.filter(model=>model.upstream_model==='gpt-test').length === 2, '同名模型在 API 中按两个分组分别公开');
+  check(catalog.filter(model=>model.upstream_model==='gpt-test').every(model=>model.name==='gpt-test' && model.display_name==='gpt-test'), 'API 显示名只包含原始模型名');
+  check(catalog.filter(model=>model.upstream_model==='gpt-test').map(model=>model.owned_by).sort().join('|') === ['Aurora API/备用通道','Aurora API/日常使用'].sort().join('|'), 'API 保留中转和分组标题');
   check(catalog.some(model=>model.id==='Aurora API/日常使用/gpt-test') && catalog.some(model=>model.id==='Aurora API/备用通道/gpt-test'), '完整调用 ID 包含中转和对应分组');
   await page.getByRole('switch', {name:'启用模型 gpt-test',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('[aria-label="启用模型 gpt-test"]').getAttribute('aria-checked')==='false');
