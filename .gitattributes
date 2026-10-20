@@ -10,4 +10,3 @@
 *.ps1 text eol=crlf
 *.png binary
 *.ico binary
-*.patch text eol=lf -whitespace
